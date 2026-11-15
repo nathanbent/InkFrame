@@ -1,0 +1,15 @@
+[Unit]
+Description=InkFrame e-ink display
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+WorkingDirectory=@DIR@
+ExecStart=@VENV@/bin/python -m inkframe
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

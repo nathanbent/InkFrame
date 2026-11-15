@@ -1,0 +1,28 @@
+# InkFrame settings. install.sh copies this to config.toml, which git ignores.
+# Restart after editing:  sudo systemctl restart inkframe
+
+[app]
+start_mode = "weather"          # "weather" or "slideshow" (the last mode used wins after a restart)
+
+[display]
+saturation = 0.5                # 0..1; higher = punchier colours in photos
+rotate = 0                      # 180 if the frame is mounted upside down
+clean_every = 48                # clean cycle every N refreshes to limit ghosting (0 = never)
+quiet_hours = []                # e.g. [23, 7] skips timed refreshes from 23:00 to 07:00
+
+[buttons]
+enabled = true
+
+[weather]
+latitude = 40.7128              # set these to your location
+longitude = -74.0060
+location_name = "Home"          # shown in the header; "" to hide
+units = "imperial"              # or "metric"
+interval_minutes = 30
+
+[slideshow]
+folder = "~/Pictures/inkframe"  # subfolders are included
+interval_minutes = 15
+fit = "crop"                    # "crop" fills the screen; "fit" shows the whole photo with white bars
+colour_boost = 1.3              # extra saturation before dithering (1.0 = off)
+contrast_boost = 1.1
