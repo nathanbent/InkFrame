@@ -65,11 +65,12 @@ class CalendarMode:
                 req = urllib.request.Request(url, headers=HEADERS)
                 with urllib.request.urlopen(req, timeout=60) as resp:
                     data = resp.read()
+                _check_ics(data, i)
                 cached.write_bytes(data)
             except Exception as exc:
-                if not cached.exists():
-                    raise RuntimeError(f"calendar {i + 1} could not be downloaded: {exc}") from exc
-                log.warning("calendar %d fetch failed (%s); using cached copy", i + 1, exc)
+                if not cached.exists() or not _is_ics(cached.read_bytes()):
+                    raise RuntimeError(f"Calendar {i + 1}: {_short(exc)}") from None
+                log.warning("calendar %d fetch failed (%s); using cached copy", i + 1, _short(exc))
                 data, stale = cached.read_bytes(), True
             texts.append((data, colour))
         return texts, stale
@@ -232,6 +233,25 @@ class CalendarMode:
                 d.text((x0 + 88, y), _fit(d, title, font(16, True), x1 - x0 - 88),
                        font=font(16, True), fill=BLACK)
                 y += 23
+
+
+def _is_ics(data):
+    return data.lstrip()[:15].upper().startswith(b"BEGIN:VCALENDAR")
+
+
+def _check_ics(data, i):
+    if _is_ics(data):
+        return
+    if b"<html" in data[:2000].lower() or b"<!doctype" in data[:2000].lower():
+        raise ValueError("that link returned a web page (probably a sign-in page), not calendar "
+                         "data. Use the calendar's 'Secret address in iCal format', which ends "
+                         "in /basic.ics")
+    raise ValueError("that link did not return iCal (.ics) data")
+
+
+def _short(exc, limit=200):
+    text = " ".join(str(exc).split())
+    return text if len(text) <= limit else text[:limit] + "..."
 
 
 def _local(dt):

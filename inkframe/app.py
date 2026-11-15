@@ -81,8 +81,12 @@ class App:
                 mode.next()
             img = mode.render(self.display.size)
         except Exception as exc:
-            log.exception("%s failed to render", self.mode)
-            img = self._error_screen(f"{self.mode} failed", str(exc))
+            detail = " ".join(str(exc).split())
+            if len(detail) > 400:
+                detail = detail[:400] + "..."
+            log.error("%s failed to render: %s", self.mode, detail[:1000])
+            log.debug("traceback", exc_info=True)
+            img = self._error_screen(f"{self.mode} failed", detail)
         try:
             self.display.show(img, self.mode)
         except Exception:
