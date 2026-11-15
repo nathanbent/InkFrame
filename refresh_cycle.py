@@ -19,10 +19,20 @@ started late or rebooted drops straight back into step.
 
 What gets shown
 ---------------
-Slots are grouped into blocks of 8. Each block picks one pattern (stripes,
-checkers, rings, plasma, ...) and shows it 7 times, rotating the colours by one
-each time, so over a block every pixel is driven to all 7 colours. The 8th frame
-of each block is the controller's CLEAN pass.
+Slots are grouped into blocks of 8: 7 picture frames, then the controller's
+CLEAN pass. Within a block the same layout is shown 7 times with the colours
+rotated one step each time, so by the end of the block every pixel has been
+driven to each of the 7 colours exactly once - wear is even per pixel, whatever
+the pattern looks like.
+
+  * Every 4th block is the plain full-panel sweep: solid black, white, green,
+    blue, red, yellow and orange (in a different order each time).
+  * The other blocks walk a list of ~20 patterns (stripes, checkers, rings,
+    noise, voronoi cells, random rectangles, ...) in a freshly shuffled order
+    each lap, with random sizes and positions.
+  * The colour order changes every block (a different starting colour and a
+    different step round the 7), arranged so that over every 6 blocks each
+    colour-to-colour transition is exercised equally often too.
 """
 
 import argparse
@@ -53,20 +63,25 @@ PREVIEW_RGB = [
 ]
 
 BLOCK_LEN = NUM_COLOURS + 1  # 7 colour rotations + 1 CLEAN frame
+SOLID_EVERY = 4              # every 4th block is the plain solid-colour sweep
 
 
 # --------------------------------------------------------------------------
 # Patterns. Each returns an (h, w) uint8 array of colour indices 0..6.
-# They draw randomness only from rng.randrange so that every Pi, whatever its
-# Python/numpy version, produces identical output for the same seed.
+# They draw randomness only from rng.randrange / rng.getrandbits (never from
+# numpy's generators) so that every Pi, whatever its Python/numpy version,
+# produces identical output for the same seed.
 # --------------------------------------------------------------------------
 
 def _grid(w, h):
     return np.meshgrid(np.arange(w), np.arange(h))
 
 
-def pat_solid(w, h, rng):
-    return np.zeros((h, w), dtype=np.int64)
+def _random_cells(rows, cols, rng):
+    """(rows, cols) array of random colour indices, cheap even for every pixel."""
+    n = rows * cols
+    raw = rng.getrandbits(8 * n).to_bytes(n, "little")
+    return (np.frombuffer(raw, dtype=np.uint8).astype(np.int64) % NUM_COLOURS).reshape(rows, cols)
 
 
 def pat_vstripes(w, h, rng):
@@ -141,8 +156,95 @@ def pat_quilt(w, h, rng):
     return np.maximum(dx, dy) // band + (x // tile) + (y // tile)
 
 
+def pat_pinstripes(w, h, rng):
+    """1-3 pixel lines, vertical or horizontal."""
+    x, y = _grid(w, h)
+    return (x if rng.randrange(2) else y) // rng.randrange(1, 4)
+
+
+def pat_noise(w, h, rng):
+    """Random colour per cell, from single pixels up to 6px speckle."""
+    size = rng.randrange(1, 7)
+    cells = _random_cells(h // size + 1, w // size + 1, rng)
+    return np.repeat(np.repeat(cells, size, axis=0), size, axis=1)[:h, :w]
+
+
+def pat_rectangles(w, h, rng):
+    """Overlapping random rectangles of random colours."""
+    out = np.full((h, w), rng.randrange(NUM_COLOURS), dtype=np.int64)
+    for _ in range(rng.randrange(40, 160)):
+        rw, rh = rng.randrange(10, w // 2), rng.randrange(10, h // 2)
+        x0, y0 = rng.randrange(-rw // 2, w), rng.randrange(-rh // 2, h)
+        out[max(0, y0):y0 + rh, max(0, x0):x0 + rw] = rng.randrange(NUM_COLOURS)
+    return out
+
+
+def pat_voronoi(w, h, rng):
+    """Irregular cells around random points."""
+    x, y = _grid(w, h)
+    best = np.full((h, w), 1 << 40, dtype=np.int64)
+    out = np.zeros((h, w), dtype=np.int64)
+    for i in range(rng.randrange(12, 70)):
+        px, py = rng.randrange(w), rng.randrange(h)
+        d = (x - px) ** 2 + (y - py) ** 2
+        closer = d < best
+        best[closer] = d[closer]
+        out[closer] = i
+    return out
+
+
+def pat_spiral(w, h, rng):
+    x, y = _grid(w, h)
+    cx, cy = rng.randrange(w), rng.randrange(h)
+    arms = rng.randrange(1, 4) * NUM_COLOURS * (1 if rng.randrange(2) else -1)
+    band = rng.randrange(10, 50)
+    turn = (np.arctan2(y - cy, x - cx) + math.pi) / (2 * math.pi)
+    return np.floor(np.hypot(x - cx, y - cy) / band + turn * arms).astype(np.int64)
+
+
+def pat_dots(w, h, rng):
+    """Grid of discs, each a different colour from its background."""
+    x, y = _grid(w, h)
+    cell = rng.randrange(16, 90)
+    radius = cell * rng.randrange(25, 46) // 100
+    step = rng.randrange(1, NUM_COLOURS)
+    inside = (x % cell - cell // 2) ** 2 + (y % cell - cell // 2) ** 2 <= radius ** 2
+    return x // cell + (y // cell) * step + inside * rng.randrange(1, NUM_COLOURS)
+
+
+def pat_bricks(w, h, rng):
+    x, y = _grid(w, h)
+    bh = rng.randrange(8, 50)
+    bw = bh * rng.randrange(2, 5)
+    row = y // bh
+    return (x + (row % 2) * (bw // 2)) // bw + row * rng.randrange(1, NUM_COLOURS)
+
+
+def pat_diamonds(w, h, rng):
+    x, y = _grid(w, h)
+    cx, cy = rng.randrange(w), rng.randrange(h)
+    return (np.abs(x - cx) + np.abs(y - cy)) // rng.randrange(8, 50)
+
+
+def pat_triangles(w, h, rng):
+    x, y = _grid(w, h)
+    size = rng.randrange(12, 80)
+    upper = (x % size + y % size) >= size
+    return (x // size) * 2 + upper + (y // size) * rng.randrange(1, NUM_COLOURS)
+
+
+_BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
+
+
+def pat_dither(w, h, rng):
+    """Colour ramp whose bands blend into each other with pixel-level dithering."""
+    x, y = _grid(w, h)
+    pos = (x, y, x + y)[rng.randrange(3)]
+    span = rng.randrange(40, 200)  # pixels per colour band
+    return (pos * 16 + _BAYER[y % 4, x % 4] * span) // (span * 16)
+
+
 PATTERNS = [
-    ("solid", pat_solid),
     ("vertical stripes", pat_vstripes),
     ("horizontal stripes", pat_hstripes),
     ("colour bars", pat_colour_bars),
@@ -154,7 +256,25 @@ PATTERNS = [
     ("plasma", pat_plasma),
     ("waves", pat_waves),
     ("quilt", pat_quilt),
+    ("pinstripes", pat_pinstripes),
+    ("noise", pat_noise),
+    ("random rectangles", pat_rectangles),
+    ("voronoi cells", pat_voronoi),
+    ("spiral", pat_spiral),
+    ("dots", pat_dots),
+    ("bricks", pat_bricks),
+    ("diamonds", pat_diamonds),
+    ("triangles", pat_triangles),
+    ("dithered ramp", pat_dither),
 ]
+
+
+def _shuffled(n, rng):
+    order = list(range(n))
+    for i in range(n - 1, 0, -1):
+        j = rng.randrange(i + 1)
+        order[i], order[j] = order[j], order[i]
+    return order
 
 
 def frame_for_slot(slot, w, h, seed=0):
@@ -163,24 +283,30 @@ def frame_for_slot(slot, w, h, seed=0):
     if phase == NUM_COLOURS:
         return "CLEAN", np.full((h, w), CLEAN, dtype=np.uint8), WHITE
 
+    # The colour order for this block: start at a random colour and step round
+    # the 7 by 1..6 each frame. Any step still gives every pixel all 7 colours
+    # once; using each step once per 6 blocks (in shuffled order) means every
+    # colour-to-colour transition gets exercised equally often.
+    group, idx = divmod(block, NUM_COLOURS - 1)
+    step = 1 + _shuffled(NUM_COLOURS - 1, random.Random(seed * 15485863 + group * 7 + 3))[idx]
+    start = random.Random(seed * 32452843 + block * 11 + 5).randrange(NUM_COLOURS)
+    colours = ((np.arange(NUM_COLOURS) * step + start) % NUM_COLOURS).astype(np.uint8)
+
+    if block % SOLID_EVERY == SOLID_EVERY - 1:
+        colour = int(colours[phase])
+        return "solid " + COLOUR_NAMES[colour], np.full((h, w), colour, dtype=np.uint8), colour
+
     # Walk the pattern list in a freshly shuffled order each time round, so
     # every pattern comes up equally often but never in a fixed sequence.
-    lap, pos = divmod(block, len(PATTERNS))
-    order = list(range(len(PATTERNS)))
-    lap_rng = random.Random(seed * 1000003 + lap)
-    for i in range(len(order) - 1, 0, -1):
-        j = lap_rng.randrange(i + 1)
-        order[i], order[j] = order[j], order[i]
+    lap, pos = divmod(block - block // SOLID_EVERY, len(PATTERNS))
+    order = _shuffled(len(PATTERNS), random.Random(seed * 1000003 + lap))
     name, func = PATTERNS[order[pos]]
 
     rng = random.Random(seed * 7919 + block * 104729 + 1)
     base = np.asarray(func(w, h, rng), dtype=np.int64)
-    frame = ((base + phase) % NUM_COLOURS).astype(np.uint8)
-    if name == "solid":
-        name = "solid " + COLOUR_NAMES[phase]
-    else:
-        name = "%s (rotation %d/%d)" % (name, phase + 1, NUM_COLOURS)
-    return name, frame, phase
+    frame = colours[(base + phase) % NUM_COLOURS]
+    name = "%s (rotation %d/%d)" % (name, phase + 1, NUM_COLOURS)
+    return name, frame, int(colours[phase])
 
 
 # --------------------------------------------------------------------------
@@ -196,6 +322,12 @@ def to_image(frame):
 
 
 def open_display():
+    try:
+        import inky  # noqa: F401
+    except ImportError:
+        sys.exit("The 'inky' library isn't installed for %s.\n"
+                 "Run this script with the InkFrame virtual environment instead:\n"
+                 "    ~/inky-env/bin/python %s" % (sys.executable, " ".join(sys.argv)))
     try:
         from inky.auto import auto
         return auto()

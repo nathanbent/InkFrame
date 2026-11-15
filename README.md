@@ -86,7 +86,7 @@ sudo systemctl stop inkframe
 nohup ~/inky-env/bin/python refresh_cycle.py > refresh.log 2>&1 &
 ```
 
-Each pattern (stripes, checkerboards, rings, plasma and so on) is shown 7 times with the colours shifted by one each time, so every pixel is driven to all 7 colours, followed by a clean pass. Frames are derived from the clock, so several frames started with the same `--interval` and `--seed` show the same thing at the same moment without talking to each other, as long as their clocks are synced. Stopping it (`kill`, or Ctrl-C) finishes the current refresh, cleans the panel and leaves it white; afterwards run `sudo systemctl start inkframe`. `--hours`, `--interval` and `--preview DIR` (PNGs, no panel needed) are the main options.
+Frames come in blocks of 8: one layout shown 7 times with the colours rotated each time, so every pixel is driven to each of the 7 colours exactly once, followed by a clean pass. Every 4th block is the plain solid-colour sweep (the whole panel black, white, green, blue, red, yellow, orange); the others cycle through about 20 patterns (stripes, checkerboards, rings, noise, voronoi cells, random rectangles and so on) in shuffled order with random sizes. The colour order changes each block so that every colour-to-colour transition is used equally often. Frames are derived from the clock, so several frames started with the same `--interval` and `--seed` show the same thing at the same moment without talking to each other, as long as their clocks are synced. Stopping it (`kill`, or Ctrl-C) finishes the current refresh, cleans the panel and leaves it white; afterwards run `sudo systemctl start inkframe`. `--hours`, `--interval` and `--preview DIR` (PNGs, no panel needed) are the main options.
 
 ## Logs
 
