@@ -1,11 +1,15 @@
 """Thin wrapper around the Inky driver, plus a dry-run mode that saves PNG previews."""
 import logging
 import time
+import warnings
 from pathlib import Path
 
 from PIL import Image
 
 log = logging.getLogger(__name__)
+
+# The driver warns on every refresh while it waits for the panel; it's expected, not a fault.
+warnings.filterwarnings("ignore", message="Busy Wait", category=UserWarning)
 
 # Palette indices used by the UC8159 7-colour panel.
 BLACK, WHITE, GREEN, BLUE, RED, YELLOW, ORANGE, CLEAN = range(8)
