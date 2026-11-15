@@ -35,7 +35,7 @@ DEFAULTS = {
         "sources": [],           # iCal links, or tables with url and colour
         "days": 7,               # how many days ahead to list
         "week_start": "sunday",  # or "monday"
-        "interval_minutes": 15,  # how often to check; only redraws when something changed
+        "interval_minutes": 5,   # how often to check; only redraws when something changed
     },
     "potd": {
         "interval_minutes": 60,  # how often to check whether the day's picture has changed

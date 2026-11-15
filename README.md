@@ -62,7 +62,7 @@ sources = [
 
 Each calendar gets its own colour marker (blue, red, green, orange, black, or set `colour`). The secret address works like a password, which is why it lives in `config.toml` (not committed to git). Event times use the Pi's time zone; check it with `timedatectl` and set it with `sudo timedatectl set-timezone America/New_York` (or yours). Google can take several hours to publish changes to this link.
 
-The calendar checks every 15 minutes but only redraws when something changed, such as a new event or one finishing.
+The calendar checks every 5 minutes but only redraws when something changed, such as a new event or one finishing.
 
 ## Running by hand
 

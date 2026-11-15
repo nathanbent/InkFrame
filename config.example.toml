@@ -37,7 +37,7 @@ sources = [
 ]
 days = 7                        # how many days ahead to list
 week_start = "sunday"           # or "monday"
-interval_minutes = 15           # how often to check; only redraws when something changed
+interval_minutes = 5            # how often to check; only redraws when something changed
 
 [potd]                          # Wikimedia Commons picture of the day (button C)
 interval_minutes = 60           # how often to check for a new day's picture
