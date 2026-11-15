@@ -197,6 +197,12 @@ def to_image(frame):
 
 def open_display():
     try:
+        import inky  # noqa: F401
+    except ImportError:
+        sys.exit("The 'inky' library isn't installed for %s.\n"
+                 "Run this script with the InkFrame virtual environment instead:\n"
+                 "    ~/inky-env/bin/python %s" % (sys.executable, " ".join(sys.argv)))
+    try:
         from inky.auto import auto
         return auto()
     except Exception as exc:  # no EEPROM detected etc. - assume the 5.7" Impression
