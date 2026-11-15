@@ -77,6 +77,17 @@ sudo systemctl stop inkframe
 
 `--dry-run` also works on a normal computer with Pillow installed, for working on layouts.
 
+## Refresh cycling
+
+`refresh_cycle.py` is a standalone script that runs the panel through a long series of colour and pattern refreshes, to exercise a panel whose colours have faded or ghosted. By default it refreshes every 2 minutes for 24 hours. Stop the service first:
+
+```bash
+sudo systemctl stop inkframe
+nohup ~/inky-env/bin/python refresh_cycle.py > refresh.log 2>&1 &
+```
+
+Each pattern (stripes, checkerboards, rings, plasma and so on) is shown 7 times with the colours shifted by one each time, so every pixel is driven to all 7 colours, followed by a clean pass. Frames are derived from the clock, so several frames started with the same `--interval` and `--seed` show the same thing at the same moment without talking to each other, as long as their clocks are synced. Stopping it (`kill`, or Ctrl-C) finishes the current refresh, cleans the panel and leaves it white; afterwards run `sudo systemctl start inkframe`. `--hours`, `--interval` and `--preview DIR` (PNGs, no panel needed) are the main options.
+
 ## Logs
 
 ```bash
