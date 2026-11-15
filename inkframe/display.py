@@ -78,14 +78,8 @@ class Display:
 
     def _save_preview(self, img, label):
         if img.mode != "P":
-            # Mimic the driver: blend palettes by saturation, then Floyd-Steinberg dither.
-            s = self.saturation
-            blend = [tuple(int(p * s + d * (1 - s)) for p, d in zip(pure, panel))
-                     for pure, panel in zip(PURE_RGB[:7], PANEL_RGB[:7])]
-            pal = Image.new("P", (1, 1))
-            pal.putpalette(_flat(blend))
-            img = img.convert("RGB").quantize(palette=pal, dither=Image.Dither.FLOYDSTEINBERG)
-            img.putpalette(_flat(PANEL_RGB))
+            from .photo import dither
+            img = dither(img, self.saturation)
         out = self.preview_dir / f"{time.strftime('%H%M%S')}-{label}.png"
         img.convert("RGB").save(out)
         log.info("preview saved to %s", out)

@@ -2,9 +2,12 @@
 
 Buttons:
   A  weather dashboard
-  B  photo slideshow (press again for the next photo)
-  C  refresh now (next photo in slideshow mode)
+  B  photo slideshow
+  C  Wikimedia Commons picture of the day
   D  clean the screen to reduce ghosting, then redraw
+
+Pressing the button for the mode already showing refreshes it
+(next photo in the slideshow, re-fetch the weather or picture of the day).
 """
 import argparse
 import json
@@ -24,6 +27,7 @@ from .fonts import font
 from .modes import MODES
 
 log = logging.getLogger("inkframe")
+BUTTON_MODES = {"A": "weather", "B": "slideshow", "C": "potd"}
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config.toml"
 
 
@@ -53,25 +57,24 @@ class App:
     # ---------- actions ----------
     def handle_button(self, label):
         """Turn a button label into (clean_first, advance)."""
-        if label == "A":
-            self._set_mode("weather")
-            return False, False
-        if label == "B":
-            advance = self.mode == "slideshow"
-            self._set_mode("slideshow")
-            return False, advance
-        if label == "C":
-            return False, True
         if label == "D":
             return True, False
-        return None
+        mode = BUTTON_MODES.get(label)
+        if mode is None:
+            return None
+        advance = self.mode == mode
+        self._set_mode(mode)
+        return False, advance
 
-    def refresh(self, clean_first=False, advance=True):
+    def refresh(self, clean_first=False, advance=True, timed=False):
+        mode = self.modes[self.mode]
+        if timed and not getattr(mode, "changed", lambda: True)():
+            log.info("%s unchanged; skipping refresh", self.mode)
+            return
         clean_every = self.cfg["display"]["clean_every"]
         if clean_first or (clean_every and self.since_clean >= clean_every):
             self.display.clean()
             self.since_clean = 0
-        mode = self.modes[self.mode]
         try:
             if advance:
                 mode.next()
@@ -116,7 +119,7 @@ class App:
                     if self._quiet():
                         next_due = time.monotonic() + 300
                         continue
-                    action = (False, True)
+                    action = (False, True, True)
                 if action is None:
                     continue
             self.refresh(*action)

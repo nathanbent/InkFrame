@@ -3,10 +3,11 @@ import json
 import logging
 import random
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageOps
+from PIL import Image, ImageDraw
 
 from ..display import BLACK, WHITE, new_canvas
 from ..fonts import font
+from ..photo import prepare
 
 log = logging.getLogger(__name__)
 
@@ -63,15 +64,8 @@ class SlideshowMode:
     def _load(self, path, size):
         log.info("showing %s", path)
         with Image.open(path) as im:
-            im = ImageOps.exif_transpose(im)
-            im.draft("RGB", (size[0] * 2, size[1] * 2))   # fast JPEG downscale on the Zero
-            im = im.convert("RGB")
-        if self.cfg["fit"] == "fit":
-            im = ImageOps.pad(im, size, color=(255, 255, 255))
-        else:
-            im = ImageOps.fit(im, size, method=Image.Resampling.LANCZOS)
-        im = ImageEnhance.Color(im).enhance(self.cfg["colour_boost"])
-        return ImageEnhance.Contrast(im).enhance(self.cfg["contrast_boost"])
+            return prepare(im, size, self.cfg["fit"], self.cfg["colour_boost"],
+                           self.cfg["contrast_boost"])
 
     def _empty(self, size):
         img = new_canvas(size)

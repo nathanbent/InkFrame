@@ -1,6 +1,6 @@
 # InkFrame
 
-A weather dashboard and photo slideshow for the Pimoroni Inky Impression 5.7" (7-colour, 600×448), running on a Raspberry Pi Zero W.
+A weather dashboard, photo slideshow and Wikimedia picture of the day for the Pimoroni Inky Impression 5.7" (7-colour, 600×448), running on a Raspberry Pi Zero W.
 
 ![Weather dashboard preview](docs/weather.png)
 
@@ -9,9 +9,11 @@ A weather dashboard and photo slideshow for the Pimoroni Inky Impression 5.7" (7
 | Button | Action |
 | --- | --- |
 | A | Weather dashboard |
-| B | Photo slideshow (press again for the next photo) |
-| C | Refresh now (next photo in slideshow mode) |
+| B | Photo slideshow |
+| C | Wikimedia Commons Picture of the Day |
 | D | Clean the screen to reduce ghosting, then redraw |
+
+Pressing the button for the mode that's already showing refreshes it: the next photo in the slideshow, or fresh weather.
 
 A refresh takes about 30 seconds. Presses made during a refresh are not lost: the most recent one runs when the refresh finishes.
 
@@ -38,6 +40,10 @@ scp *.jpg nathan@<pi-address>:~/Pictures/inkframe/
 ```
 
 Photos are shown in a random order with no repeats until every photo has been shown. New photos are picked up automatically. Bright, high-contrast images with large areas of colour look best on this panel; fine detail and skin tones dither heavily.
+
+## Picture of the day
+
+Button C shows [Wikimedia Commons' Picture of the Day](https://commons.wikimedia.org/wiki/Commons:Picture_of_the_day) with its caption and credit along the bottom. It's downloaded once a day and cached in `~/.local/state/inkframe/potd/`. The mode checks hourly but only redraws the screen when a new day's picture arrives, so it isn't flashing for nothing. Panoramas and very tall pictures are shown whole with white bars rather than cropped; set `fit = "crop"` under `[potd]` to always fill the screen, or `caption = false` to hide the caption.
 
 ## Running by hand
 
@@ -69,6 +75,8 @@ inkframe/
   buttons.py        side buttons via libgpiod
   modes/weather.py  Open-Meteo dashboard (no API key needed)
   modes/slideshow.py
+  modes/potd.py     Wikimedia Commons picture of the day
+  photo.py          shared crop / colour-boost / dither helpers
 ```
 
-A new mode is a class with `name`, `interval` (seconds), `next()` and `render(size)` returning a Pillow image, registered in `modes/__init__.py`. Draw dashboards on `display.new_canvas()` using the palette constants (`BLACK`, `RED`, ...) for crisp, undithered colours; return an RGB image for photos.
+A new mode is a class with `name`, `interval` (seconds), `next()` and `render(size)` returning a Pillow image, registered in `modes/__init__.py` and given a button in `BUTTON_MODES` in `app.py`. An optional `changed()` returning `False` lets timed refreshes skip redrawing. Draw dashboards on `display.new_canvas()` using the palette constants (`BLACK`, `RED`, ...) for crisp, undithered colours; return an RGB image for photos.
