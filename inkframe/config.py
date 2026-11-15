@@ -31,6 +31,12 @@ DEFAULTS = {
         "colour_boost": 1.3,    # extra saturation before dithering (1.0 = none)
         "contrast_boost": 1.1,
     },
+    "calendar": {
+        "sources": [],           # iCal links, or tables with url and colour
+        "days": 7,               # how many days ahead to list
+        "week_start": "sunday",  # or "monday"
+        "interval_minutes": 15,  # how often to check; only redraws when something changed
+    },
     "potd": {
         "interval_minutes": 60,  # how often to check whether the day's picture has changed
         "caption": True,         # title and credit strip along the bottom

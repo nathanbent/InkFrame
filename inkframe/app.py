@@ -4,7 +4,8 @@ Buttons:
   A  weather dashboard
   B  photo slideshow
   C  Wikimedia Commons picture of the day
-  D  clean the screen to reduce ghosting, then redraw
+  D  calendar
+  Hold D for 2 seconds to clean the screen (reduces ghosting), then redraw.
 
 Pressing the button for the mode already showing refreshes it
 (next photo in the slideshow, re-fetch the weather or picture of the day).
@@ -27,7 +28,7 @@ from .fonts import font
 from .modes import MODES
 
 log = logging.getLogger("inkframe")
-BUTTON_MODES = {"A": "weather", "B": "slideshow", "C": "potd"}
+BUTTON_MODES = {"A": "weather", "B": "slideshow", "C": "potd", "D": "calendar"}
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config.toml"
 
 
@@ -57,9 +58,9 @@ class App:
     # ---------- actions ----------
     def handle_button(self, label):
         """Turn a button label into (clean_first, advance)."""
-        if label == "D":
+        if label == "D_hold":
             return True, False
-        mode = BUTTON_MODES.get(label)
+        mode = BUTTON_MODES.get(label.removesuffix("_hold"))
         if mode is None:
             return None
         advance = self.mode == mode
