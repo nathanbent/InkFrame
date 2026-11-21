@@ -5,21 +5,23 @@ import time
 
 log = logging.getLogger(__name__)
 
-# BCM pin numbers on the Inky Impression 5.7"
+# BCM pin numbers on the Inky Impression 4", 5.7" and 7.3" (button C is GPIO 25 on the 13.3").
+# Overridden by [buttons] pins in config.toml.
 PINS = {"A": 5, "B": 6, "C": 16, "D": 24}
 DEBOUNCE = 0.3     # ignore repeat presses of the same button closer together than this
 MIN_PRESS = 0.03   # contact bounce shorter than this is ignored
 HOLD = 1.5         # a press at least this long is reported as "<label>_hold"
 
 
-def start(callback):
+def start(callback, pins=None):
     """Call callback("A".."D", or "A_hold".."D_hold") from a background thread on release."""
-    thread = threading.Thread(target=_run, args=(callback,), daemon=True, name="buttons")
+    pins = dict(pins or PINS)
+    thread = threading.Thread(target=_run, args=(callback, pins), daemon=True, name="buttons")
     thread.start()
     return thread
 
 
-def _run(callback):
+def _run(callback, pins):
     try:
         import gpiod
         import gpiodevice
@@ -30,12 +32,12 @@ def _run(callback):
         )
         chip = gpiodevice.find_chip_by_platform()
         offsets = []
-        for pin in PINS.values():
+        for pin in pins.values():
             try:
                 offsets.append(chip.line_offset_from_id(pin))
             except Exception:
                 offsets.append(pin)
-        labels = dict(zip(offsets, PINS))
+        labels = dict(zip(offsets, pins))
         request = chip.request_lines(
             consumer="inkframe-buttons", config=dict.fromkeys(offsets, settings)
         )
@@ -43,7 +45,7 @@ def _run(callback):
         log.exception("buttons unavailable; continuing without them")
         return
 
-    log.info("listening for buttons on GPIO %s", list(PINS.values()))
+    log.info("listening for buttons on GPIO %s", list(pins.values()))
     falling = gpiod.EdgeEvent.Type.FALLING_EDGE
     pressed, last = {}, {}
     while True:

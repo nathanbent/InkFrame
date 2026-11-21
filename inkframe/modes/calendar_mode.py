@@ -13,7 +13,8 @@ from datetime import date, datetime, time, timedelta
 
 from PIL import ImageDraw
 
-from ..display import BLACK, BLUE, GREEN, ORANGE, RED, WHITE, new_canvas
+from .. import display
+from ..display import BLACK, BLUE, GREEN, ORANGE, RED, WHITE, YELLOW, new_canvas
 from ..fonts import font
 from .weather import CODES, _clock, draw_icon
 
@@ -21,7 +22,8 @@ log = logging.getLogger(__name__)
 
 HEADERS = {"User-Agent": "InkFrame/1.0 (Raspberry Pi e-ink calendar)"}
 SOURCE_COLOURS = [BLUE, RED, GREEN, ORANGE, BLACK]
-COLOUR_NAMES = {"black": BLACK, "blue": BLUE, "red": RED, "green": GREEN, "orange": ORANGE}
+COLOUR_NAMES = {"black": BLACK, "blue": BLUE, "red": RED, "green": GREEN, "orange": ORANGE,
+                "yellow": YELLOW}
 
 
 class CalendarMode:
@@ -52,8 +54,10 @@ class CalendarMode:
         for i, src in enumerate(self.cfg["sources"]):
             if isinstance(src, str):
                 src = {"url": src}
+            # 6-colour panels have no orange (it would show as red), so skip it in the rotation.
+            rotation = [c for c in SOURCE_COLOURS if c < display.PANEL.colours]
             colour = COLOUR_NAMES.get(str(src.get("colour", "")).lower(),
-                                      SOURCE_COLOURS[i % len(SOURCE_COLOURS)])
+                                      rotation[i % len(rotation)])
             out.append((i, src["url"], colour))
         return out
 

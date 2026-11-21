@@ -1,6 +1,16 @@
 # InkFrame
 
-A weather dashboard, photo slideshow, Wikimedia picture of the day and calendar for the Pimoroni Inky Impression 5.7" (7-colour, 600×448), running on a Raspberry Pi Zero W.
+A weather dashboard, photo slideshow, Wikimedia picture of the day and calendar for the Pimoroni Inky Impression, running on a Raspberry Pi.
+
+Supported panels (detected automatically):
+
+| Panel | Resolution | Colours |
+| --- | --- | --- |
+| Inky Impression 7.3" (Spectra 6, 2025) | 800×480 | black, white, red, yellow, green, blue |
+| Inky Impression 7.3" (2023) | 800×480 | the above plus orange |
+| Inky Impression 5.7" | 600×448 | the above plus orange |
+
+On the 6-colour Spectra panel, anything drawn in orange (the sun's rays, the sunrise/sunset line) is drawn in red instead.
 
 ![Weather dashboard preview](docs/weather.png)
 
@@ -12,7 +22,7 @@ A weather dashboard, photo slideshow, Wikimedia picture of the day and calendar 
 | B | Photo slideshow |
 | C | Wikimedia Commons Picture of the Day |
 | D | Calendar |
-| Hold D (2 s) | Clean the screen to reduce ghosting, then redraw |
+| Hold D (2 s) | Clean the screen to reduce ghosting, then redraw (on the Spectra panel: black, then white, then redraw) |
 
 Pressing the button for the mode that's already showing refreshes it: the next photo in the slideshow, or fresh weather or calendar data. Buttons act when released, so a hold can be told apart from a press.
 
@@ -20,17 +30,20 @@ A refresh takes about 30 seconds. Presses made during a refresh are not lost: th
 
 ## Install
 
-Enable SPI and I2C, and on current Raspberry Pi OS add `dtoverlay=spi0-0cs` to `/boot/firmware/config.txt`, then reboot. Then:
+On a fresh Raspberry Pi OS (Bookworm or later), with the Inky board attached and the Pi on the network:
 
 ```bash
-git clone <this repo> ~/inkframe
+sudo apt-get install -y git
+git clone https://github.com/nathanbent/InkFrame.git ~/inkframe
 cd ~/inkframe
 ./install.sh
 nano config.toml          # set latitude / longitude
-sudo systemctl start inkframe
+sudo reboot
 ```
 
-`install.sh` reuses the virtual environment at `~/inky-env` (override with `VENV=...`), copies `config.example.toml` to `config.toml`, creates `~/Pictures/inkframe`, and installs a systemd service that starts on boot.
+`install.sh` installs the system packages, enables SPI and I2C, adds `dtoverlay=spi0-0cs` to `/boot/firmware/config.txt` (the Inky driver needs the chip-select pin for itself), creates a Python virtual environment at `~/inky-env` (override with `VENV=...`), copies `config.example.toml` to `config.toml`, creates `~/Pictures/inkframe`, and installs a systemd service that starts on boot. The reboot is only needed the first time, for the SPI/I2C changes; after that, `sudo systemctl restart inkframe` picks up config changes.
+
+If the board isn't detected (`couldn't identify the Inky board` in the log), check that the ribbon/header is seated, run `ls /dev/spidev0.0 /dev/i2c-1` to confirm SPI and I2C are on, or set `panel` under `[display]` in `config.toml` to skip detection.
 
 ## Photos
 
@@ -40,7 +53,7 @@ Put photos in `~/Pictures/inkframe` (subfolders work). From another computer:
 scp *.jpg nathan@<pi-address>:~/Pictures/inkframe/
 ```
 
-Photos are shown in a random order with no repeats until every photo has been shown. New photos are picked up automatically. Bright, high-contrast images with large areas of colour look best on this panel; fine detail and skin tones dither heavily.
+Photos are shown in a random order with no repeats until every photo has been shown. New photos are picked up automatically. Bright, high-contrast images with large areas of colour look best on these panels; fine detail and skin tones dither heavily. Photos are cropped to fill the screen (5:3 on the 7.3", 4:3 on the 5.7"); set `fit = "fit"` under `[slideshow]` to show them whole.
 
 ## Picture of the day
 
@@ -75,11 +88,11 @@ sudo systemctl stop inkframe
 ~/inky-env/bin/python -m inkframe --dry-run --once          # no display: writes a PNG to ./preview
 ```
 
-`--dry-run` also works on a normal computer with Pillow installed, for working on layouts.
+`--dry-run` also works on a normal computer with Pillow installed, for working on layouts. It previews the 7.3" Spectra panel unless `panel` is set under `[display]`.
 
 ## Refresh cycling
 
-`refresh_cycle.py` is a standalone script that runs the panel through a long series of colour and pattern refreshes, to exercise a panel whose colours have faded or ghosted. By default it refreshes every 2 minutes for 24 hours. Stop the service first:
+`refresh_cycle.py` (7-colour panels only) is a standalone script that runs the panel through a long series of colour and pattern refreshes, to exercise a panel whose colours have faded or ghosted. By default it refreshes every 2 minutes for 24 hours. Stop the service first:
 
 ```bash
 sudo systemctl stop inkframe

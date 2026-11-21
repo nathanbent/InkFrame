@@ -7,11 +7,14 @@ start_mode = "weather"          # "weather", "slideshow", "potd" or "calendar" (
 [display]
 saturation = 0.5                # 0..1; higher = punchier colours in photos
 rotate = 0                      # 180 if the frame is mounted upside down
+panel = "auto"                  # "auto" detects the board; or "spectra73" (7.3" 2025, 6 colours),
+                                # "impression73-7colour" (7.3" 2023) or "impression57" (5.7")
 clean_every = 48                # clean cycle every N refreshes to limit ghosting (0 = never)
 quiet_hours = []                # e.g. [23, 7] skips timed refreshes from 23:00 to 07:00
 
 [buttons]
 enabled = true
+# pins = { A = 5, B = 6, C = 16, D = 24 }   # BCM numbers; on the 13.3" button C is 25
 
 [weather]
 latitude = 40.7128              # set these to your location

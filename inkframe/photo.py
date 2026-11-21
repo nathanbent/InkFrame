@@ -1,7 +1,8 @@
 """Photo helpers shared by the slideshow and picture-of-the-day modes."""
 from PIL import Image, ImageEnhance, ImageOps
 
-from .display import PANEL_RGB, PURE_RGB, _flat
+from . import display
+from .display import PURE_RGB, _flat
 
 
 def prepare(im, size, fit="crop", colour_boost=1.0, contrast_boost=1.0):
@@ -33,10 +34,12 @@ def dither(im, saturation):
     Use this when you want to draw crisp text or shapes on top of a photo afterwards.
     """
     s = saturation
-    blend = [tuple(int(p * s + d * (1 - s)) for p, d in zip(pure, panel))
-             for pure, panel in zip(PURE_RGB[:7], PANEL_RGB[:7])]
+    panel = display.PANEL
+    n = panel.colours            # InkFrame indices 0..n-1 are the panel's real colours
+    blend = [tuple(int(p * s + d * (1 - s)) for p, d in zip(pure, rgb))
+             for pure, rgb in zip(PURE_RGB[:n], panel.rgb[:n])]
     pal = Image.new("P", (1, 1))
-    pal.putpalette(_flat(blend))
+    pal.putpalette([c for rgb in blend for c in rgb])
     out = im.convert("RGB").quantize(palette=pal, dither=Image.Dither.FLOYDSTEINBERG)
-    out.putpalette(_flat(PANEL_RGB))
+    out.putpalette(_flat(display.preview_rgb()))
     return out

@@ -82,6 +82,9 @@ class WeatherMode:
         w, h = size
         cur, daily, hourly = data["current"], data["daily"], data["hourly"]
         now = datetime.fromisoformat(cur["time"])
+        # Laid out for 600x448; wider and taller panels (800x480) spread out to fill the space.
+        dx = (w - 600) // 5
+        dy = h - 448
 
         # Header bar
         d.rectangle((0, 0, w, 36), fill=BLACK)
@@ -95,12 +98,12 @@ class WeatherMode:
 
         # Current conditions
         label, kind = CODES.get(cur["weather_code"], ("Unknown", "cloudy"))
-        draw_icon(d, kind, 16, 50, 130, night=not cur.get("is_day", 1))
-        d.text((160, 44), f"{round(cur['temperature_2m'])}°", font=font(100, True), fill=BLACK)
-        d.text((164, 160), label, font=font(26, True), fill=KIND_COLOUR[kind])
+        draw_icon(d, kind, 16 + dx, 50, 130, night=not cur.get("is_day", 1))
+        d.text((160 + dx, 44), f"{round(cur['temperature_2m'])}°", font=font(100, True), fill=BLACK)
+        d.text((164 + dx, 160), label, font=font(26, True), fill=KIND_COLOUR[kind])
 
         # Detail column
-        x, y = 420, 46
+        x, y = w - 180 - dx, 46
         rows = [
             ("High", f"{round(daily['temperature_2m_max'][0])}°", RED),
             ("Low", f"{round(daily['temperature_2m_min'][0])}°", BLUE),
@@ -119,8 +122,8 @@ class WeatherMode:
                fill=ORANGE, anchor="ra")
 
         # 24-hour chart
-        self._chart(d, hourly, now, (44, 226, w - 16, 320))
-        d.line((0, 340, w, 340), fill=BLACK, width=2)
+        self._chart(d, hourly, now, (44, 226, w - 16, 320 + dy))
+        d.line((0, 340 + dy, w, 340 + dy), fill=BLACK, width=2)
 
         # Next three days
         col = w // 3
@@ -128,17 +131,17 @@ class WeatherMode:
             cx = col * (i - 1) + col // 2
             day = datetime.fromisoformat(daily["time"][i])
             _, k = CODES.get(daily["weather_code"][i], ("", "cloudy"))
-            d.text((cx, 350), day.strftime("%A"), font=font(18, True), fill=BLACK, anchor="ma")
-            draw_icon(d, k, cx - 75, 376, 60)
-            d.text((cx + 2, 386), f"{round(daily['temperature_2m_max'][i])}°",
+            d.text((cx, 350 + dy), day.strftime("%A"), font=font(18, True), fill=BLACK, anchor="ma")
+            draw_icon(d, k, cx - 75, 376 + dy, 60)
+            d.text((cx + 2, 386 + dy), f"{round(daily['temperature_2m_max'][i])}°",
                    font=font(22, True), fill=RED)
-            d.text((cx + 2, 412), f"{round(daily['temperature_2m_min'][i])}°",
+            d.text((cx + 2, 412 + dy), f"{round(daily['temperature_2m_min'][i])}°",
                    font=font(18), fill=BLUE)
             pop = daily["precipitation_probability_max"][i]
             if pop:
-                d.text((cx + 70, 416), f"{pop}%", font=font(14), fill=BLUE, anchor="ra")
+                d.text((cx + 70, 416 + dy), f"{pop}%", font=font(14), fill=BLUE, anchor="ra")
             if i < 3:
-                d.line((col * i, 348, col * i, h - 8), fill=BLACK)
+                d.line((col * i, 348 + dy, col * i, h - 8), fill=BLACK)
         return img
 
     def _chart(self, d, hourly, now, box):
@@ -176,7 +179,7 @@ class WeatherMode:
                 bx = x0 + i * step
                 d.line((bx, y1, bx, y1 + 4), fill=BLACK)
                 d.text((bx, y1 + 6), "Now" if i == 0 else _clock(t, short=True),
-                       font=font(13), fill=BLACK, anchor="ma")
+                       font=font(13), fill=BLACK, anchor="ra" if bx > x1 - 20 else "ma")
 
 
 def _clock(t, short=False):
