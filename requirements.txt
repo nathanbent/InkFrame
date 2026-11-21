@@ -1,4 +1,4 @@
-inky>=2.0
+inky>=2.6
 pillow>=10.1
 icalendar>=6.0
 recurring-ical-events>=3.0

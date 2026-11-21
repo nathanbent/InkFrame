@@ -330,11 +330,17 @@ def open_display():
                  "    ~/inky-env/bin/python %s" % (sys.executable, " ".join(sys.argv)))
     try:
         from inky.auto import auto
-        return auto()
+        display = auto(ask_user=False)
+        if display is None:
+            raise RuntimeError("no EEPROM detected")
     except Exception as exc:  # no EEPROM detected etc. - assume the 5.7" Impression
         print("inky auto-detect failed (%s); falling back to UC8159 600x448" % exc)
         from inky.inky_uc8159 import Inky
         return Inky()
+    if type(display).__module__ not in ("inky.inky_uc8159", "inky.inky_ac073tc1a"):
+        sys.exit("This script drives the 7-colour Inky Impression panels only; this board "
+                 "(%s) has a different colour set." % type(display).__module__)
+    return display
 
 
 def push(display, frame, border):

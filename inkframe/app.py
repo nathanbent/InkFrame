@@ -170,7 +170,7 @@ def main(argv=None):
     if args.mode:
         app._set_mode(args.mode)
     if not args.dry_run and not args.once and cfg["buttons"]["enabled"]:
-        buttons.start(app.presses.put)
+        buttons.start(app.presses.put, cfg["buttons"]["pins"])
     if args.once:
         app.refresh(clean_first=args.clean)
         return
