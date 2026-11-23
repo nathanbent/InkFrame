@@ -6,7 +6,7 @@ start_mode = "weather"          # "weather", "slideshow", "potd" or "calendar" (
 
 [display]
 saturation = 0.5                # 0..1; higher = punchier colours in photos
-rotate = 0                      # 180 if the frame is mounted upside down
+rotate = 0                      # 180 = upside down; 90 or 270 = portrait (if 90 is upside down, use 270)
 panel = "auto"                  # "auto" detects the board; or "spectra73" (7.3" 2025, 6 colours),
                                 # "impression73-7colour" (7.3" 2023) or "impression57" (5.7")
 clean_every = 48                # clean cycle every N refreshes to limit ghosting (0 = never)
