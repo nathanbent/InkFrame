@@ -60,7 +60,7 @@ class WeatherMode:
             "temperature_unit": self.temp_unit,
             "wind_speed_unit": self.wind_unit,
             "timezone": "auto",
-            "forecast_days": 4,
+            "forecast_days": 7,
         }
         url = API + "?" + urllib.parse.urlencode(params)
         try:
@@ -80,31 +80,37 @@ class WeatherMode:
         img = new_canvas(size)
         d = ImageDraw.Draw(img)
         w, h = size
-        cur, daily, hourly = data["current"], data["daily"], data["hourly"]
+        cur = data["current"]
         now = datetime.fromisoformat(cur["time"])
-        # Laid out for 600x448; wider and taller panels (800x480) spread out to fill the space.
-        dx = (w - 600) // 5
-        dy = h - 448
+        self._header(d, w, now, stale)
+        if h > w:
+            self._portrait(d, data, now, w, h)
+        else:
+            self._landscape(d, data, now, w, h)
+        return img
 
-        # Header bar
+    def _header(self, d, w, now, stale):
         d.rectangle((0, 0, w, 36), fill=BLACK)
-        d.text((12, 18), now.strftime("%A, %B ") + str(now.day), font=font(20, True),
-               fill=WHITE, anchor="lm")
-        right = self.cfg["location_name"] or ""
-        right = (right + "  " if right else "") + "Updated " + _clock(now)
-        if stale:
-            right = "OFFLINE - " + right
+        title = now.strftime("%A, %B ") + str(now.day)
+        d.text((12, 18), title, font=font(20, True), fill=WHITE, anchor="lm")
+        room = w - 36 - d.textlength(title, font=font(20, True))
+        name = self.cfg["location_name"] or ""
+        offline = "OFFLINE - " if stale else ""
+        # Drop the location, then the word "Updated", if the header is too narrow for them.
+        for right in (offline + (name + "  " if name else "") + "Updated " + _clock(now),
+                      offline + "Updated " + _clock(now), offline + _clock(now)):
+            if d.textlength(right, font=font(15)) <= room:
+                break
         d.text((w - 12, 18), right, font=font(15), fill=WHITE, anchor="rm")
 
-        # Current conditions
+    def _current(self, d, cur, x):
         label, kind = CODES.get(cur["weather_code"], ("Unknown", "cloudy"))
-        draw_icon(d, kind, 16 + dx, 50, 130, night=not cur.get("is_day", 1))
-        d.text((160 + dx, 44), f"{round(cur['temperature_2m'])}°", font=font(100, True), fill=BLACK)
-        d.text((164 + dx, 160), label, font=font(26, True), fill=KIND_COLOUR[kind])
+        draw_icon(d, kind, x, 50, 130, night=not cur.get("is_day", 1))
+        d.text((x + 144, 44), f"{round(cur['temperature_2m'])}°", font=font(100, True), fill=BLACK)
+        d.text((x + 148, 160), label, font=font(26, True), fill=KIND_COLOUR[kind])
 
-        # Detail column
-        x, y = w - 180 - dx, 46
-        rows = [
+    def _details(self, cur, daily):
+        return [
             ("High", f"{round(daily['temperature_2m_max'][0])}°", RED),
             ("Low", f"{round(daily['temperature_2m_min'][0])}°", BLUE),
             ("Rain", f"{daily['precipitation_probability_max'][0] or 0}%", BLUE),
@@ -112,14 +118,26 @@ class WeatherMode:
             ("Wind", f"{round(cur['wind_speed_10m'])} {self.wind_label}", BLACK),
             ("Humid", f"{cur['relative_humidity_2m']}%", BLACK),
         ]
-        for name, value, colour in rows:
+
+    def _sun(self, daily):
+        sunrise = datetime.fromisoformat(daily["sunrise"][0])
+        sunset = datetime.fromisoformat(daily["sunset"][0])
+        return f"Sun {_clock(sunrise)} - {_clock(sunset)}"
+
+    def _landscape(self, d, data, now, w, h):
+        cur, daily, hourly = data["current"], data["daily"], data["hourly"]
+        # Laid out for 600x448; wider and taller panels (800x480) spread out to fill the space.
+        dx = (w - 600) // 5
+        dy = h - 448
+        self._current(d, cur, 16 + dx)
+
+        # Detail column
+        x, y = w - 180 - dx, 46
+        for name, value, colour in self._details(cur, daily):
             d.text((x, y), name, font=font(18), fill=BLACK)
             d.text((w - 14, y), value, font=font(18, True), fill=colour, anchor="ra")
             y += 24
-        sunrise = datetime.fromisoformat(daily["sunrise"][0])
-        sunset = datetime.fromisoformat(daily["sunset"][0])
-        d.text((w - 14, y + 2), f"Sun {_clock(sunrise)} - {_clock(sunset)}", font=font(14),
-               fill=ORANGE, anchor="ra")
+        d.text((w - 14, y + 2), self._sun(daily), font=font(14), fill=ORANGE, anchor="ra")
 
         # 24-hour chart
         self._chart(d, hourly, now, (44, 226, w - 16, 320 + dy))
@@ -142,7 +160,49 @@ class WeatherMode:
                 d.text((cx + 70, 416 + dy), f"{pop}%", font=font(14), fill=BLUE, anchor="ra")
             if i < 3:
                 d.line((col * i, 348 + dy, col * i, h - 8), fill=BLACK)
-        return img
+
+    def _portrait(self, d, data, now, w, h):
+        """Tall layout (480x800): details in two columns, then the chart, then a row per day."""
+        cur, daily, hourly = data["current"], data["daily"], data["hourly"]
+        self._current(d, cur, 16)
+
+        rows = self._details(cur, daily)
+        half = w // 2
+        for n, (name, value, colour) in enumerate(rows):
+            x0 = 16 if n < 3 else half + 12
+            x1 = half - 12 if n < 3 else w - 14
+            y = 212 + (n % 3) * 26
+            d.text((x0, y), name, font=font(18), fill=BLACK)
+            d.text((x1, y), value, font=font(18, True), fill=colour, anchor="ra")
+        d.line((half, 214, half, 286), fill=BLACK)
+        d.text((w // 2, 300), self._sun(daily), font=font(15), fill=ORANGE, anchor="ma")
+
+        top = 340
+        self._chart(d, hourly, now, (44, top + 20, w - 16, top + 140))
+        d.line((0, top + 176, w, top + 176), fill=BLACK, width=2)
+
+        # A row per day: up to 6, as many as fit at 44 px or more each.
+        y0, y1 = top + 184, h - 6
+        days = max(1, min(6, len(daily["time"]) - 1, int((y1 - y0) // 44)))
+        row = (y1 - y0) / max(days, 1)
+        for i in range(1, days + 1):
+            y = y0 + row * (i - 1)
+            mid = y + row / 2
+            day = datetime.fromisoformat(daily["time"][i])
+            label, k = CODES.get(daily["weather_code"][i], ("", "cloudy"))
+            s = min(56, row - 4)
+            draw_icon(d, k, 10, mid - s / 2, s)
+            d.text((76, mid - 2), day.strftime("%A"), font=font(19, True), fill=BLACK, anchor="ls")
+            d.text((76, mid + 4), label, font=font(14), fill=KIND_COLOUR[k], anchor="lt")
+            pop = daily["precipitation_probability_max"][i]
+            if pop:
+                d.text((w - 150, mid), f"{pop}%", font=font(15), fill=BLUE, anchor="rm")
+            d.text((w - 72, mid), f"{round(daily['temperature_2m_max'][i])}°", font=font(22, True),
+                   fill=RED, anchor="rm")
+            d.text((w - 14, mid), f"{round(daily['temperature_2m_min'][i])}°", font=font(19),
+                   fill=BLUE, anchor="rm")
+            if i < days:
+                d.line((10, y + row, w - 10, y + row), fill=BLACK)
 
     def _chart(self, d, hourly, now, box):
         x0, y0, x1, y1 = box

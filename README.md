@@ -45,6 +45,18 @@ sudo reboot
 
 If the board isn't detected (`couldn't identify the Inky board` in the log), check that the ribbon/header is seated, run `ls /dev/spidev0.0 /dev/i2c-1` to confirm SPI and I2C are on, or set `panel` under `[display]` in `config.toml` to skip detection.
 
+## Portrait or upside down
+
+Set `rotate` under `[display]` in `config.toml`, then `sudo systemctl restart inkframe`:
+
+| `rotate` | Frame |
+| --- | --- |
+| `0` | landscape (default) |
+| `180` | landscape, upside down |
+| `90` or `270` | portrait: one is each way up, so if `90` comes out upside down, use `270` |
+
+In portrait the weather lists the next 6 days with one day per row, and the calendar puts the month and today's weather above the events. Photos are cropped to the tall shape; set `fit = "fit"` under `[slideshow]` to show landscape photos whole.
+
 ## Photos
 
 Put photos in `~/Pictures/inkframe` (subfolders work). From another computer:

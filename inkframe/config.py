@@ -10,7 +10,7 @@ DEFAULTS = {
     },
     "display": {
         "saturation": 0.5,      # 0..1, how hard photos are pushed toward the panel's colours
-        "rotate": 0,            # 0 or 180 if the frame is mounted upside down
+        "rotate": 0,            # 0, 90, 180 or 270 (90 and 270 are portrait)
         "panel": "auto",        # "auto" reads the board's EEPROM; or "spectra73", "impression57", ...
         "clean_every": 48,      # run a clean cycle every N refreshes (0 = never)
         "quiet_hours": [],      # e.g. [23, 7] = no timed refreshes 23:00-07:00

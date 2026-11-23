@@ -70,6 +70,14 @@ DRIVER_PANELS = {
     "inky.inky_e673": "spectra73",
 }
 
+# [display] rotate: degrees the picture is turned clockwise to suit how the frame is mounted.
+ROTATIONS = {
+    0: None,
+    90: Image.Transpose.ROTATE_270,     # Pillow's ROTATE_n turns anticlockwise
+    180: Image.Transpose.ROTATE_180,
+    270: Image.Transpose.ROTATE_90,
+}
+
 DEFAULT_DRY_RUN_PANEL = "spectra73"
 PANEL = PANELS[DEFAULT_DRY_RUN_PANEL]
 
@@ -116,7 +124,9 @@ def _driver(name):
 class Display:
     def __init__(self, cfg, dry_run=False, preview_dir="preview"):
         self.saturation = float(cfg["display"]["saturation"])
-        self.rotate = int(cfg["display"]["rotate"])
+        self.rotate = int(cfg["display"]["rotate"]) % 360
+        if self.rotate not in ROTATIONS:
+            raise ValueError("[display] rotate must be 0, 90, 180 or 270")
         self.dry_run = dry_run
         self.preview_dir = Path(preview_dir)
         wanted = cfg["display"].get("panel", "auto")
@@ -146,18 +156,20 @@ class Display:
             set_panel(wanted)
             self.inky = _driver(wanted)
         self.panel = PANEL
-        self.size = PANEL.size if dry_run else tuple(self.inky.resolution)
+        width, height = PANEL.size if dry_run else tuple(self.inky.resolution)
+        # Modes draw at the size the viewer sees: portrait when the frame is turned on its side.
+        self.size = (height, width) if self.rotate in (90, 270) else (width, height)
         log.info("display ready: %s, %sx%s%s", PANEL.description, *self.size,
                  " (dry run)" if dry_run else "")
 
     def show(self, img, label="frame"):
         """Push an image to the panel. 'P' images are drawn with panel indices; RGB is dithered."""
-        if self.rotate:
-            img = img.rotate(self.rotate)
         start = time.monotonic()
         if self.dry_run:
-            self._save_preview(img, label)
+            self._save_preview(img, label)      # previews stay the way up the viewer sees them
         else:
+            if self.rotate:
+                img = img.transpose(ROTATIONS[self.rotate])
             if img.mode == "P":
                 self._set_indexed(img)
             else:

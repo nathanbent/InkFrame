@@ -145,14 +145,22 @@ class CalendarMode:
         busy = {e["start"].date() for e in events}
         busy |= {day for day in agenda}
         self._month(d, today, busy, 10, 46)
-        self._weather(d, 14, 300)
-        d.line((240, 46, 240, h - 10), fill=BLACK)
+        if h > w:
+            # Portrait: month and today's weather side by side, events underneath.
+            self._weather(d, min(254, w - 216), 96)
+            d.line((10, 286, w - 10, 286), fill=BLACK)
+            list_box = (14, 298, w - 12, h - 8)
+        else:
+            self._weather(d, 14, 300)
+            d.line((240, 46, 240, h - 10), fill=BLACK)
+            list_box = (254, 46, w - 12, h - 8)
         if not self.cfg["sources"]:
-            d.multiline_text((254, 60), "No calendar linked yet.\n\nAdd your Google Calendar's\n"
+            d.multiline_text((list_box[0], list_box[1] + 14),
+                             "No calendar linked yet.\n\nAdd your Google Calendar's\n"
                              "secret iCal address under\n[calendar] in config.toml.",
                              font=font(16), fill=BLACK, spacing=6)
         else:
-            self._list(d, agenda, today, 254, 46, w - 12, h - 8)
+            self._list(d, agenda, today, *list_box)
         return img
 
     def _month(self, d, today, busy, x0, y0):
