@@ -129,11 +129,15 @@ class Display:
             self.preview_dir.mkdir(parents=True, exist_ok=True)
         elif wanted == "auto":
             from inky.auto import auto
-            self.inky = auto(ask_user=False)
+            try:
+                self.inky = auto(ask_user=False)
+            except RuntimeError:
+                self.inky = None
             if self.inky is None:
                 raise RuntimeError(
-                    "couldn't identify the Inky board from its EEPROM. Check that I2C and SPI "
-                    "are enabled, or set panel under [display] in config.toml")
+                    "couldn't identify the Inky board from its EEPROM. Set panel under [display] "
+                    'in config.toml (e.g. panel = "spectra73" for the 7.3" Spectra 6), and check '
+                    "that the board is seated and I2C is enabled")
             module = type(self.inky).__module__
             if module not in DRIVER_PANELS:
                 raise RuntimeError(f"InkFrame doesn't support this Inky board yet ({module})")

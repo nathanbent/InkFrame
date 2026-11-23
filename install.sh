@@ -7,9 +7,10 @@ VENV="${VENV:-$HOME/inky-env}"
 
 echo "== System packages"
 sudo apt-get update
-# numpy comes from apt: building it with pip takes hours on a Pi and fills the small /tmp.
-sudo apt-get install -y git python3-venv python3-dev python3-numpy build-essential libopenblas0 \
-  fonts-dejavu-core
+# numpy and Pillow come from apt: building numpy with pip takes hours on a Pi and fills the
+# small /tmp, and piwheels' Pillow needs image libraries a fresh Raspberry Pi OS doesn't have.
+sudo apt-get install -y git python3-venv python3-dev python3-numpy python3-pil build-essential \
+  libopenblas0 fonts-dejavu-core
 
 echo "== SPI and I2C for the Inky board"
 REBOOT=0
@@ -30,6 +31,8 @@ echo "== Python environment in $VENV"
 # --system-site-packages lets the environment use apt's numpy.
 [ -x "$VENV/bin/python" ] || python3 -m venv --system-site-packages "$VENV"
 sed -i "s/^include-system-site-packages = false/include-system-site-packages = true/" "$VENV/pyvenv.cfg"
+# A Pillow that pip put in the environment earlier may be missing its libraries; use apt's.
+"$VENV/bin/python" -c "import PIL.Image" 2> /dev/null || "$VENV/bin/pip" uninstall -y pillow
 # Build in a folder on the SD card rather than /tmp, which is a small RAM disk.
 export TMPDIR="$HOME/.cache/inkframe-build"
 mkdir -p "$TMPDIR"
