@@ -7,7 +7,9 @@ VENV="${VENV:-$HOME/inky-env}"
 
 echo "== System packages"
 sudo apt-get update
-sudo apt-get install -y git python3-venv python3-dev build-essential libopenblas0 fonts-dejavu-core
+# numpy comes from apt: building it with pip takes hours on a Pi and fills the small /tmp.
+sudo apt-get install -y git python3-venv python3-dev python3-numpy build-essential libopenblas0 \
+  fonts-dejavu-core
 
 echo "== SPI and I2C for the Inky board"
 REBOOT=0
@@ -25,8 +27,14 @@ fi
 [ -e /dev/spidev0.0 ] && [ -e /dev/i2c-1 ] || REBOOT=1
 
 echo "== Python environment in $VENV"
-[ -x "$VENV/bin/python" ] || python3 -m venv "$VENV"
+# --system-site-packages lets the environment use apt's numpy.
+[ -x "$VENV/bin/python" ] || python3 -m venv --system-site-packages "$VENV"
+sed -i "s/^include-system-site-packages = false/include-system-site-packages = true/" "$VENV/pyvenv.cfg"
+# Build in a folder on the SD card rather than /tmp, which is a small RAM disk.
+export TMPDIR="$HOME/.cache/inkframe-build"
+mkdir -p "$TMPDIR"
 "$VENV/bin/pip" install -r "$DIR/requirements.txt"
+rm -rf "$TMPDIR"
 
 echo "== Config and photo folder"
 [ -f "$DIR/config.toml" ] || cp "$DIR/config.example.toml" "$DIR/config.toml"
