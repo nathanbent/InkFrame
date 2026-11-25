@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InkFrame</title>
+<style>
+  :root {
+    --bg: #f4f2ee; --card: #fff; --text: #1d1d1b; --muted: #6b6a66; --line: #e2dfd8;
+    --accent: #c8402f; --accent-text: #fff; --chip: #efece6; --danger: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --card: #22211f; --text: #ecebe7; --muted: #a09e98; --line: #34322f;
+      --accent: #e0644f; --accent-text: #fff; --chip: #2d2c29; --danger: #f2827a;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button, select, input[type=number] {
+    font: inherit; color: var(--text); background: var(--chip); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 12px; min-height: 38px;
+  }
+  button { cursor: pointer; }
+  button:hover { filter: brightness(0.97); }
+  button.primary, button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.danger { color: var(--danger); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .screen { position: relative; background: var(--chip); border-radius: 8px; overflow: hidden; }
+  .screen img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .screen .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3a9b5c; }
+  .busy .dot { background: #d9a520; animation: pulse 1s infinite alternate; }
+  @keyframes pulse { to { opacity: 0.3; } }
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+  .modes button { padding: 12px; }
+  .form { display: grid; grid-template-columns: max-content 1fr; gap: 10px 14px; align-items: center; }
+  .form label { color: var(--muted); }
+  .form select, .form input[type=number] { width: 100%; max-width: 360px; }
+  @media (max-width: 480px) { .form { grid-template-columns: 1fr; gap: 4px; } .form .field { margin-bottom: 8px; } }
+  .crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 12px; }
+  .crumbs a { color: var(--accent); text-decoration: none; cursor: pointer; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  .tile { position: relative; border-radius: 8px; overflow: hidden; background: var(--chip);
+          aspect-ratio: 1; cursor: pointer; border: 2px solid transparent; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile.current { border-color: var(--accent); }
+  .tile .name { position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 6px; font-size: 12px;
+                background: linear-gradient(transparent, rgba(0,0,0,0.65)); color: #fff;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .folder { display: grid; place-items: center; text-align: center; padding: 8px; font-weight: 500; }
+  .folder svg { width: 40px; height: 40px; color: var(--muted); display: block; margin: 0 auto 6px; }
+  .menu { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; place-items: center; padding: 16px; z-index: 10; }
+  .menu.open { display: grid; }
+  .menu .card { width: min(420px, 100%); display: grid; gap: 10px; }
+  .menu img { width: 100%; max-height: 50vh; object-fit: contain; border-radius: 8px; background: var(--chip); }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text);
+           color: var(--bg); padding: 10px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s;
+           pointer-events: none; max-width: calc(100% - 32px); z-index: 20; }
+  .toast.show { opacity: 1; }
+  progress { width: 100%; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>InkFrame</h1>
+    <span id="state" class="badge"><span class="dot"></span><span id="stateText">Connecting…</span></span>
+  </header>
+
+  <section class="card">
+    <div id="screen" class="screen"><img id="screenImg" alt="What the frame is showing" hidden><div id="screenEmpty" class="empty">Nothing drawn yet</div></div>
+    <p id="nowShowing" class="small muted" style="margin:10px 0 0"></p>
+  </section>
+
+  <section class="card">
+    <h2>Show</h2>
+    <div id="modes" class="modes"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="nextBtn">Next / refresh</button>
+      <button id="cleanBtn" title="Reduces ghosting; takes about a minute">Clean screen</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Slideshow</h2>
+    <div class="form">
+      <label for="ssFolder">Folder</label>
+      <div class="field"><select id="ssFolder"></select></div>
+      <label for="ssSub">Subfolders</label>
+      <div class="field"><label class="row" style="color:inherit"><input type="checkbox" id="ssSub"> Include photos in subfolders</label></div>
+      <label for="ssOrder">Order</label>
+      <div class="field"><select id="ssOrder"><option value="shuffle">Shuffle</option><option value="name">By name</option></select></div>
+      <label for="ssInterval">Change every</label>
+      <div class="field row"><input type="number" id="ssInterval" min="1" step="1" style="width:110px"> <span class="muted">minutes</span></div>
+      <label for="ssFit">Photos</label>
+      <div class="field"><select id="ssFit"><option value="crop">Fill the screen (crop)</option><option value="fit">Show the whole photo</option><option value="auto">Crop unless it cuts off a lot</option></select></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="ssStart" class="primary">Start slideshow</button>
+      <span id="ssCount" class="small muted"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="justify-content:space-between; margin-bottom:8px">
+      <h2 style="margin:0">Photos</h2>
+      <div class="row">
+        <button id="playHere">Play this folder</button>
+        <button id="mkdirBtn">New folder</button>
+        <button id="uploadBtn" class="primary">Upload</button>
+        <input id="uploadInput" type="file" accept="image/*" multiple hidden>
+      </div>
+    </div>
+    <div id="crumbs" class="crumbs"></div>
+    <div id="uploading" hidden style="margin-bottom:12px"><div id="uploadText" class="small muted"></div><progress id="uploadBar" max="1" value="0"></progress></div>
+    <div id="grid" class="grid"></div>
+    <p id="gridEmpty" class="muted" hidden>No photos here yet. Upload some, or copy them to <code id="rootPath"></code> on the Pi.</p>
+  </section>
+</main>
+
+<div id="menu" class="menu">
+  <div class="card">
+    <img id="menuImg" alt="">
+    <div id="menuName" class="small muted" style="word-break:break-all"></div>
+    <button id="menuShow" class="primary">Show on the frame now</button>
+    <button id="menuDelete" class="danger">Delete photo</button>
+    <button id="menuClose">Cancel</button>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const FOLDER_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+let status = null, browsing = "", screenVersion = -1, formDirty = false, menuPath = null;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  const data = res.headers.get("Content-Type")?.includes("json") ? await res.json() : null;
+  if (!res.ok) throw new Error(data?.error || res.statusText);
+  return data;
+}
+const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 3000); }
+async function command(body, msg) {
+  try { await post("/api/command", body); toast(msg || "Sent — the frame takes about 30 seconds to redraw"); setTimeout(refreshStatus, 400); }
+  catch (e) { toast(e.message); }
+}
+function ago(t) {
+  if (!t) return "";
+  const s = Math.round(Date.now() / 1000 - t);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  return `${Math.round(s / 3600)} h ago`;
+}
+function until(t) {
+  const s = Math.round(t - Date.now() / 1000);
+  if (s < 60) return "in under a minute";
+  if (s < 3600) return `in ${Math.round(s / 60)} min`;
+  return `in ${(s / 3600).toFixed(1)} h`;
+}
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const thumbUrl = (path) => "/api/thumb?path=" + encodeURIComponent(path);
+
+// ---------- status ----------
+async function refreshStatus() {
+  try { status = await api("/api/status"); } catch { $("stateText").textContent = "Can't reach the frame"; $("state").classList.remove("busy"); return; }
+  const busy = status.busy || status.queued > 0;
+  $("state").classList.toggle("busy", busy);
+  $("stateText").textContent = busy ? "Updating the screen…" : "Ready";
+  $("screen").style.aspectRatio = `${status.size[0]} / ${status.size[1]}`;
+  $("rootPath").textContent = status.photo_root;
+
+  const modes = $("modes");
+  if (!modes.children.length) {
+    for (const m of status.modes) {
+      const b = document.createElement("button");
+      b.textContent = m.name; b.dataset.mode = m.id;
+      b.onclick = () => command({ cmd: "mode", mode: m.id });
+      modes.appendChild(b);
+    }
+  }
+  for (const b of modes.children) b.classList.toggle("active", b.dataset.mode === status.mode);
+  $("nextBtn").textContent = status.mode === "slideshow" ? "Next photo" : "Refresh";
+
+  const name = status.modes.find((m) => m.id === status.mode)?.name || status.mode;
+  let text = name;
+  if (status.mode === "slideshow" && status.photo) text += ` · ${status.photo}`;
+  if (status.last_refresh) text += ` · drawn ${ago(status.last_refresh)}`;
+  if (status.next_refresh && !busy) text += ` · next ${until(status.next_refresh)}`;
+  $("nowShowing").textContent = text;
+
+  if (status.screen_version !== screenVersion) {
+    screenVersion = status.screen_version;
+    const img = $("screenImg");
+    img.onload = () => { img.hidden = false; $("screenEmpty").hidden = true; };
+    img.src = "/api/screen.png?v=" + screenVersion;
+    document.querySelectorAll(".tile.current").forEach((t) => t.classList.remove("current"));
+    if (status.photo) document.querySelector(`.tile[data-path="${CSS.escape(status.photo)}"]`)?.classList.add("current");
+  }
+  if (!formDirty) fillForm();
+}
+async function poll() {
+  await refreshStatus();
+  const busy = status && (status.busy || status.queued > 0);
+  setTimeout(poll, busy ? 2000 : 5000);
+}
+
+// ---------- slideshow settings ----------
+async function loadFolders(selectPath) {
+  const list = await api("/api/folders");
+  const sel = $("ssFolder");
+  sel.innerHTML = "";
+  for (const f of list) {
+    const o = document.createElement("option");
+    o.value = f.path;
+    const depth = f.path ? f.path.split("/").length : 0;
+    o.textContent = (f.path ? "  ".repeat(depth - 1) + f.path.split("/").pop() : "All photos") + ` (${f.total})`;
+    sel.appendChild(o);
+  }
+  sel.value = selectPath ?? status?.slideshow.folder ?? "";
+}
+function fillForm() {
+  const s = status.slideshow;
+  if ([...$("ssFolder").options].some((o) => o.value === s.folder)) $("ssFolder").value = s.folder;
+  $("ssSub").checked = s.subfolders;
+  $("ssOrder").value = s.order;
+  $("ssInterval").value = Math.round(s.interval_minutes);
+  $("ssFit").value = s.fit;
+  $("ssCount").textContent = `${s.count} photo${s.count === 1 ? "" : "s"} in the current slideshow`;
+}
+for (const id of ["ssFolder", "ssSub", "ssOrder", "ssInterval", "ssFit"]) $(id).addEventListener("input", () => { formDirty = true; });
+$("ssStart").onclick = async () => {
+  const settings = { folder: $("ssFolder").value, subfolders: $("ssSub").checked, order: $("ssOrder").value,
+                     interval_minutes: Number($("ssInterval").value) || 15, fit: $("ssFit").value };
+  formDirty = false;
+  await command({ cmd: "slideshow", settings }, "Slideshow started");
+};
+
+// ---------- browser ----------
+async function browse(folder) {
+  let data;
+  try { data = await api("/api/list?folder=" + encodeURIComponent(folder)); }
+  catch (e) { toast(e.message); if (folder) return browse(""); return; }
+  browsing = data.folder === "." ? "" : data.folder;
+  const crumbs = $("crumbs");
+  crumbs.innerHTML = "";
+  const parts = browsing ? browsing.split("/") : [];
+  const add = (label, path, last) => {
+    const el = document.createElement(last ? "span" : "a");
+    el.textContent = label;
+    if (!last) el.onclick = () => browse(path);
+    crumbs.appendChild(el);
+    if (!last) crumbs.append(" / ");
+  };
+  add("All photos", "", parts.length === 0);
+  parts.forEach((p, i) => add(p, parts.slice(0, i + 1).join("/"), i === parts.length - 1));
+
+  const grid = $("grid");
+  grid.innerHTML = "";
+  for (const name of data.folders) {
+    const path = browsing ? `${browsing}/${name}` : name;
+    const t = document.createElement("div");
+    t.className = "tile folder";
+    t.innerHTML = `<div>${FOLDER_ICON}${esc(name)}</div>`;
+    t.onclick = () => browse(path);
+    grid.appendChild(t);
+  }
+  for (const p of data.photos) {
+    const t = document.createElement("div");
+    t.className = "tile" + (status?.photo === p.path ? " current" : "");
+    t.dataset.path = p.path;
+    t.innerHTML = `<img loading="lazy" src="${thumbUrl(p.path)}" alt=""><div class="name">${esc(p.name)}</div>`;
+    t.onclick = () => openMenu(p);
+    grid.appendChild(t);
+  }
+  $("gridEmpty").hidden = data.folders.length + data.photos.length > 0;
+  $("playHere").textContent = browsing ? "Play this folder" : "Play all photos";
+  $("playHere").disabled = data.photos.length === 0 && data.folders.length === 0;
+}
+
+function openMenu(p) {
+  menuPath = p.path;
+  $("menuImg").src = thumbUrl(p.path);
+  $("menuName").textContent = p.path;
+  $("menu").classList.add("open");
+}
+const closeMenu = () => $("menu").classList.remove("open");
+$("menuClose").onclick = closeMenu;
+$("menu").onclick = (e) => { if (e.target === $("menu")) closeMenu(); };
+$("menuShow").onclick = () => { closeMenu(); command({ cmd: "show", path: menuPath }, "Showing that photo — give it about 30 seconds"); };
+$("menuDelete").onclick = async () => {
+  if (!confirm(`Delete ${menuPath}? This can't be undone.`)) return;
+  try { await post("/api/delete", { path: menuPath }); closeMenu(); toast("Deleted"); browse(browsing); loadFolders(); }
+  catch (e) { toast(e.message); }
+};
+
+$("playHere").onclick = () => {
+  formDirty = false;
+  command({ cmd: "slideshow", settings: { folder: browsing } }, `Playing ${browsing || "all photos"}`);
+  loadFolders(browsing);
+};
+$("mkdirBtn").onclick = async () => {
+  const name = prompt("New folder name");
+  if (!name) return;
+  try { const r = await post("/api/mkdir", { folder: browsing, name }); await loadFolders(); browse(r.path); }
+  catch (e) { toast(e.message); }
+};
+$("uploadBtn").onclick = () => $("uploadInput").click();
+$("uploadInput").onchange = async (e) => {
+  const files = [...e.target.files];
+  e.target.value = "";
+  if (!files.length) return;
+  $("uploading").hidden = false;
+  let done = 0, failed = [];
+  const total = files.reduce((n, f) => n + f.size, 0);
+  let sent = 0;
+  for (const f of files) {
+    $("uploadText").textContent = `Uploading ${f.name} (${done + 1} of ${files.length})`;
+    try {
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", `/api/upload?folder=${encodeURIComponent(browsing)}&name=${encodeURIComponent(f.name)}`);
+        xhr.upload.onprogress = (ev) => { $("uploadBar").value = (sent + ev.loaded) / total; };
+        xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(JSON.parse(xhr.responseText || "{}").error || xhr.statusText));
+        xhr.onerror = () => reject(new Error("network error"));
+        xhr.send(f);
+      });
+    } catch (err) { failed.push(`${f.name}: ${err.message}`); }
+    sent += f.size; done++;
+  }
+  $("uploading").hidden = true;
+  toast(failed.length ? `Couldn't upload ${failed.join("; ")}` : `Uploaded ${done} photo${done === 1 ? "" : "s"}`);
+  browse(browsing); loadFolders();
+};
+
+$("nextBtn").onclick = () => command({ cmd: "next" });
+$("cleanBtn").onclick = () => command({ cmd: "clean" }, "Cleaning — this takes a minute or so");
+
+(async () => {
+  await poll();
+  await loadFolders();
+  if (status) fillForm();
+  browse("");
+})();
+</script>
+</body>
+</html>

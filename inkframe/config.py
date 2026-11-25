@@ -19,6 +19,11 @@ DEFAULTS = {
         "enabled": True,
         "pins": {"A": 5, "B": 6, "C": 16, "D": 24},   # BCM numbers; C is 25 on the 13.3"
     },
+    "web": {
+        "enabled": True,
+        "host": "0.0.0.0",      # "127.0.0.1" to only allow the Pi itself
+        "port": 8080,
+    },
     "weather": {
         "latitude": 40.7128,
         "longitude": -74.0060,

@@ -28,6 +28,19 @@ Pressing the button for the mode that's already showing refreshes it: the next p
 
 A refresh takes about 30 seconds. Presses made during a refresh are not lost: the most recent one runs when the refresh finishes.
 
+## Web page
+
+Open `http://<pi-address>:8080` (for example `http://raspberrypi.local:8080`) on a phone or computer on the same network to:
+
+- see what the frame is showing (a preview of the dithered image) and when it next changes
+- switch modes, skip to the next photo, refresh, or clean the screen
+- set up the slideshow: which folder to play (with or without its subfolders), shuffled or by name, how often it changes, and crop or fit
+- browse the photo folder, upload photos, make folders, delete photos, or tap a photo to show it right away
+
+Slideshow choices made on the page are saved in `~/.local/state/inkframe/slideshow_settings.json` and take over from `interval_minutes` and `fit` in `config.toml`. Commands from the page queue up like button presses, so the frame still takes about 30 seconds to redraw.
+
+There's no password: anyone on your network can use the page. Set `host = "127.0.0.1"` under `[web]` to turn it off for everyone but the Pi itself, `enabled = false` to turn it off completely, or `port` to move it. Don't forward the port to the internet.
+
 ## Install
 
 On a fresh Raspberry Pi OS (Bookworm or later), with the Inky board attached and the Pi on the network:
@@ -59,13 +72,13 @@ In portrait the weather lists the next 6 days with one day per row, and the cale
 
 ## Photos
 
-Put photos in `~/Pictures/inkframe` (subfolders work). From another computer:
+Put photos in `~/Pictures/inkframe` (subfolders work), upload them from the [web page](#web-page), or from another computer:
 
 ```bash
 scp *.jpg nathan@<pi-address>:~/Pictures/inkframe/
 ```
 
-Photos are shown in a random order with no repeats until every photo has been shown. New photos are picked up automatically. Bright, high-contrast images with large areas of colour look best on these panels; fine detail and skin tones dither heavily. Photos are cropped to fill the screen (5:3 on the 7.3", 4:3 on the 5.7"); set `fit = "fit"` under `[slideshow]` to show them whole.
+Photos are shown in a random order with no repeats until every photo has been shown (or in name order, if picked on the web page). New photos are picked up automatically. Bright, high-contrast images with large areas of colour look best on these panels; fine detail and skin tones dither heavily. Photos are cropped to fill the screen (5:3 on the 7.3", 4:3 on the 5.7"); set `fit = "fit"` under `[slideshow]` to show them whole.
 
 ## Picture of the day
 
@@ -128,6 +141,7 @@ inkframe/
   app.py            main loop, buttons -> actions, timers
   display.py        Inky wrapper, palette, dry-run previews
   buttons.py        side buttons via libgpiod
+  web.py            control web page (standard library server; page in static/index.html)
   modes/weather.py  Open-Meteo dashboard (no API key needed)
   modes/slideshow.py
   modes/potd.py     Wikimedia Commons picture of the day

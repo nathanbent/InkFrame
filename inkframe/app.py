@@ -9,6 +9,8 @@ Buttons:
 
 Pressing the button for the mode already showing refreshes it
 (next photo in the slideshow, re-fetch the weather or picture of the day).
+
+The web page (web.py) sends commands through the same queue as the buttons.
 """
 import argparse
 import json
@@ -16,13 +18,14 @@ import logging
 import logging.handlers
 import queue
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
 from PIL import ImageDraw
 
-from . import buttons, config
+from . import buttons, config, web
 from .display import BLACK, RED, Display, new_canvas
 from .fonts import font
 from .modes import MODES
@@ -41,8 +44,15 @@ class App:
         self.mode = self._saved_mode() or cfg["app"]["start_mode"]
         if self.mode not in self.modes:
             self.mode = "weather"
-        self.presses = queue.Queue()
+        self.presses = queue.Queue()     # button labels (str) and web commands (dict)
         self.since_clean = 0
+        # Read by the web page.
+        self.busy = False
+        self.last_image = None           # what the panel shows, before rotation
+        self.last_refresh = None         # time.time() of the last refresh
+        self.screen_version = 0
+        self.next_due_wall = None
+        self.lock = threading.Lock()
 
     # ---------- state ----------
     def _saved_mode(self):
@@ -67,11 +77,48 @@ class App:
         self._set_mode(mode)
         return False, advance
 
+    def handle(self, item):
+        """Turn a button label or a web command into (clean_first, advance), or None."""
+        if isinstance(item, str):
+            return self.handle_button(item)
+        cmd = item.get("cmd")
+        try:
+            if cmd == "mode" and item.get("mode") in self.modes:
+                advance = self.mode == item["mode"]
+                self._set_mode(item["mode"])
+                return False, advance
+            if cmd == "next":
+                return False, True
+            if cmd == "redraw":
+                return False, False
+            if cmd == "clean":
+                return True, False
+            if cmd == "show":
+                self.modes["slideshow"].show(item["path"])
+                self._set_mode("slideshow")
+                return False, False
+            if cmd == "slideshow":
+                self.modes["slideshow"].configure(**item.get("settings", {}))
+                self._set_mode("slideshow")
+                return False, True
+        except Exception:
+            log.exception("web command %r failed", item)
+            return None
+        log.warning("unknown web command %r", item)
+        return None
+
     def refresh(self, clean_first=False, advance=True, timed=False):
         mode = self.modes[self.mode]
         if timed and not getattr(mode, "changed", lambda: True)():
             log.info("%s unchanged; skipping refresh", self.mode)
             return
+        self.busy = True
+        try:
+            self._refresh(mode, clean_first, advance)
+        finally:
+            self.busy = False
+
+    def _refresh(self, mode, clean_first, advance):
         clean_every = self.cfg["display"]["clean_every"]
         if clean_first or (clean_every and self.since_clean >= clean_every):
             self.display.clean()
@@ -91,6 +138,10 @@ class App:
             self.display.show(img, self.mode)
         except Exception:
             log.exception("display refresh failed")
+        with self.lock:
+            self.last_image = img
+            self.last_refresh = time.time()
+            self.screen_version += 1
         self.since_clean += 1
 
     def _error_screen(self, title, detail):
@@ -118,23 +169,32 @@ class App:
         while True:
             if action is None:
                 try:
-                    action = self.handle_button(
+                    action = self.handle(
                         self.presses.get(timeout=max(0.0, next_due - time.monotonic())))
                 except queue.Empty:
                     if self._quiet():
                         next_due = time.monotonic() + 300
+                        self.next_due_wall = time.time() + 300
                         continue
                     action = (False, True, True)
                 if action is None:
                     continue
+            self.next_due_wall = None
             self.refresh(*action)
-            next_due = time.monotonic() + self.modes[self.mode].interval
-            # Presses made during the ~30 s refresh: act on the most recent one only.
-            action, latest = None, None
+            interval = self.modes[self.mode].interval
+            next_due = time.monotonic() + interval
+            self.next_due_wall = time.time() + interval
+            # Presses made during the ~30 s refresh: act on the most recent button press only,
+            # but apply every web command (settings changes must not be lost).
+            pending = []
             while not self.presses.empty():
-                latest = self.presses.get_nowait()
-            if latest:
-                action = self.handle_button(latest)
+                pending.append(self.presses.get_nowait())
+            buttons_pressed = [i for i, item in enumerate(pending) if isinstance(item, str)]
+            action = None
+            for i, item in enumerate(pending):
+                if isinstance(item, str) and i != buttons_pressed[-1]:
+                    continue
+                action = self.handle(item) or action
 
 
 def _wrap(text, width):
@@ -171,6 +231,8 @@ def main(argv=None):
         app._set_mode(args.mode)
     if not args.dry_run and not args.once and cfg["buttons"]["enabled"]:
         buttons.start(app.presses.put, cfg["buttons"]["pins"])
+    if not args.once and cfg["web"]["enabled"]:
+        web.start(app, cfg["web"]["host"], cfg["web"]["port"])
     if args.once:
         app.refresh(clean_first=args.clean)
         return

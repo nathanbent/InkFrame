@@ -16,6 +16,11 @@ quiet_hours = []                # e.g. [23, 7] skips timed refreshes from 23:00 
 enabled = true
 # pins = { A = 5, B = 6, C = 16, D = 24 }   # BCM numbers; on the 13.3" button C is 25
 
+[web]                           # control page: http://<pi-address>:8080
+enabled = true
+port = 8080
+host = "0.0.0.0"                # anyone on your network can use it; "127.0.0.1" for the Pi only
+
 [weather]
 latitude = 40.7128              # set these to your location
 longitude = -74.0060
@@ -25,6 +30,8 @@ interval_minutes = 30
 
 [slideshow]
 folder = "~/Pictures/inkframe"  # subfolders are included
+# The web page can pick a folder, order, interval and fit; once it has, its choices win
+# over interval_minutes and fit here.
 interval_minutes = 15
 fit = "crop"                    # "crop" fills the screen; "fit" shows the whole photo with white bars
 colour_boost = 1.3              # extra saturation before dithering (1.0 = off)
